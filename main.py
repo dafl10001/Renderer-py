@@ -1,6 +1,8 @@
-import sys
 from vector import vec2, vec3, vec4, transform3
 import math
+import time
+import sys
+import multiprocessing
 
 FOV = math.radians(90)
 
@@ -91,6 +93,28 @@ def drawFrame(name, width, height, objects: list[tuple[list[vec3], list[tuple[in
         file.write(pixels)
 
 
+def runCore(CoreID, CoreAmount, framecount, frameCountSize, WIDTH, HEIGHT, start, tesseract_points, tesseract_edges):
+    for i in range(math.ceil(framecount / CoreAmount)):
+        angle = math.radians(i * CoreAmount * 2 + CoreID)
+        rotated_4d = [rotate4D(v, angle, angle * 0.5) for v in tesseract_points]
+
+        vertices_3d = [v.map3(3) for v in rotated_4d]
+
+        now = time.time()
+
+        cubetransform = transform3(vec3(0, 0, 5), vec3(3, 3, 3), vec3(angle * 0.2, angle * 0.3, 0))
+        final_vertices = cubetransform.mapVertices(vertices_3d)
+
+        percentile = round(100 * ((i * CoreAmount + CoreID + 1) / framecount))
+        percentSize = len(str(percentile))
+
+        iSize = len(str(i * CoreAmount + CoreID))
+
+        if CoreID == 0:
+            print("\x1b[1A" + " " * 100)
+            print(f"\x1b[1ADrawing frame #{i * CoreAmount + CoreID}{' ' * (frameCountSize - iSize)} ({' ' * (3 - percentSize)}{percentile}%) ({round(i / (now - start) * CoreAmount)}fps) with {CoreAmount} cores")
+        drawFrame(f"images/frame{i * CoreAmount + CoreID}.ppm", WIDTH, HEIGHT, [(final_vertices, tesseract_edges)])
+
 def main():
     S = 50
     WIDTH, HEIGHT = S * 8, S * 8
@@ -116,18 +140,26 @@ def main():
             if diffs == 1:
                 tesseract_edges.append((i, j))
 
-    framecount = 360
-    for i in range(framecount):
-        angle = math.radians(i * 2)
-        rotated_4d = [rotate4D(v, angle, angle * 0.5) for v in tesseract_points]
+    if len(sys.argv) != 1:
+        framecount = int(sys.argv[1])
+    else:
+        framecount = 1800
 
-        vertices_3d = [v.map3(3) for v in rotated_4d]
+    frameCountSize = len(str(framecount))
 
-        cubetransform = transform3(vec3(0, 0, 5), vec3(3, 3, 3), vec3(angle * 0.2, angle * 0.3, 0))
-        final_vertices = cubetransform.mapVertices(vertices_3d)
+    ProcessAmount = multiprocessing.cpu_count()
 
-        print(f"Drawing frame #{i} ({round(100 * ((i + 1) / framecount))}%)")
-        drawFrame(f"images/frame{i}.ppm", WIDTH, HEIGHT, [(final_vertices, tesseract_edges)])
+    print() # Print so cursor can move up
+
+    start = time.time()
+
+    TaskArgs = [(i, ProcessAmount, framecount, frameCountSize, WIDTH, HEIGHT, start, tesseract_points, tesseract_edges) for i in range(ProcessAmount)]
+    with multiprocessing.Pool(processes=ProcessAmount) as pool:
+        pool.starmap(runCore, TaskArgs)
+
+    end = time.time()
+
+    print(f"Rendering took {round(end - start)}s")
     
 
 if __name__ == "__main__":
