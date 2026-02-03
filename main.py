@@ -115,8 +115,8 @@ def renderBatch(batch_idx, CoreID, CoreAmount, framecount, frameCountSize, WIDTH
 
         if CoreID == 0:
             fps = round(i / (now - start) * CoreAmount) if (now - start) > 0 else 0
-            print("\x1b[1A" + " " * 100)
-            print(f"\x1b[1ADrawing frame #{current_frame}{' ' * (frameCountSize - iSize)} ({' ' * (3 - percentSize)}{percentile}%) ({fps}fps) with {CoreAmount} cores")
+            print("\033[1A" + " " * 100)
+            print(f"\033[1ADrawing frame #{current_frame}{' ' * (frameCountSize - iSize)} ({' ' * (3 - percentSize)}{percentile}%) ({fps}fps) with {CoreAmount} cores")
         
         frames.append((current_frame, drawFrame(WIDTH, HEIGHT, [(final_vertices, tesseract_edges)])))
     return frames
