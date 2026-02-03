@@ -79,25 +79,29 @@ def rotate4D(v: vec4, theta, phi):
     return vec4(v.x, y, v.z, w)
 
 
-def drawFrame(name, width, height, objects: list[tuple[list[vec3], list[tuple[int, int]]]]):
-    with open(name, "wb") as file:
-        file.write(f"P6\n{width} {height}\n255\n".encode())
-        pixels = bytearray()
-        for y in range(height):
-            for x in range(width):
-                pixels.extend([255, 255, 255])
+def drawFrame(width, height, objects: list[tuple[list[vec3], list[tuple[int, int]]]]):
+    header = f"P6\n{width} {height}\n255\n".encode()
+    pixels = bytearray([255, 255, 255] * height * width)
 
-        for p, e in objects:
-            drawGeometry3D(pixels, width, height, p, e, 1 / math.tan(FOV / 2))
+    for p, e in objects:
+        drawGeometry3D(pixels, width, height, p, e, 1 / math.tan(FOV / 2))
 
-        file.write(pixels)
+    return header + pixels
 
 
-def runCore(CoreID, CoreAmount, framecount, frameCountSize, WIDTH, HEIGHT, start, tesseract_points, tesseract_edges):
-    for i in range(math.ceil(framecount / CoreAmount)):
-        angle = math.radians(i * CoreAmount * 2 + CoreID)
+def renderBatch(batch_idx, CoreID, CoreAmount, framecount, frameCountSize, WIDTH, HEIGHT, start, tesseract_points, tesseract_edges):
+    frames = []
+    
+    for j in range(50):
+        i = (batch_idx * 50) + j
+        
+        current_frame = i * CoreAmount + CoreID
+        
+        if current_frame >= framecount:
+            break
+
+        angle = math.radians(current_frame * 2) 
         rotated_4d = [rotate4D(v, angle, angle * 0.5) for v in tesseract_points]
-
         vertices_3d = [v.map3(3) for v in rotated_4d]
 
         now = time.time()
@@ -105,15 +109,31 @@ def runCore(CoreID, CoreAmount, framecount, frameCountSize, WIDTH, HEIGHT, start
         cubetransform = transform3(vec3(0, 0, 5), vec3(3, 3, 3), vec3(angle * 0.2, angle * 0.3, 0))
         final_vertices = cubetransform.mapVertices(vertices_3d)
 
-        percentile = round(100 * ((i * CoreAmount + CoreID + 1) / framecount))
+        percentile = round(100 * ((current_frame + 1) / framecount))
         percentSize = len(str(percentile))
-
-        iSize = len(str(i * CoreAmount + CoreID))
+        iSize = len(str(current_frame))
 
         if CoreID == 0:
+            fps = round(i / (now - start) * CoreAmount) if (now - start) > 0 else 0
             print("\x1b[1A" + " " * 100)
-            print(f"\x1b[1ADrawing frame #{i * CoreAmount + CoreID}{' ' * (frameCountSize - iSize)} ({' ' * (3 - percentSize)}{percentile}%) ({round(i / (now - start) * CoreAmount)}fps) with {CoreAmount} cores")
-        drawFrame(f"images/frame{i * CoreAmount + CoreID}.ppm", WIDTH, HEIGHT, [(final_vertices, tesseract_edges)])
+            print(f"\x1b[1ADrawing frame #{current_frame}{' ' * (frameCountSize - iSize)} ({' ' * (3 - percentSize)}{percentile}%) ({fps}fps) with {CoreAmount} cores")
+        
+        frames.append((current_frame, drawFrame(WIDTH, HEIGHT, [(final_vertices, tesseract_edges)])))
+    return frames
+
+
+def runCore(CoreID, CoreAmount, framecount, frameCountSize, WIDTH, HEIGHT, start, tesseract_points, tesseract_edges):
+    frames_for_this_core = math.ceil(framecount / CoreAmount)
+    total_batches = math.ceil(frames_for_this_core / 50)
+    
+    for b in range(total_batches):
+        frames = renderBatch(b, CoreID, CoreAmount, framecount, frameCountSize, WIDTH, HEIGHT, start, tesseract_points, tesseract_edges)
+
+        for i in frames:
+            num, frame = i
+            with open(f"images/frame{num}.ppm", "wb") as file:
+                file.write(frame)
+            
 
 def main():
     S = 50
