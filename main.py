@@ -126,8 +126,8 @@ def renderBatch(batch_idx, CoreID, CoreAmount, framecount, frameCountSize, WIDTH
             else:
                 eta = "ETA ---"
 
-            print(f"\x1b[0mDrawing frame #{current_frame}{' ' * (frameCountSize - iSize)} with {CoreAmount} cores")
-            print(f"[{'\x1b[38;5;218m' + '#' *barPercentile + '\x1b[0m' + ' ' * (50 - barPercentile)}] \x1b[0m({percentile:>3}%) {eta}")
+            print(f"\x1b[48;5;235;38;5;213;1mDrawing frame \x1b[224m#{current_frame}{' ' * (frameCountSize - iSize)}\x1b[38;5;213m with {CoreAmount} cores")
+            print(f"\x1b[48;5;235;38;5;213;1m[{'#' *barPercentile + '.' * (50 - barPercentile)}] ({percentile:>3}%) \x1b[38;5;120m{eta}\x1b[0m")
 
             sys.stdout.flush()
 
