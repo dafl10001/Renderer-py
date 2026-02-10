@@ -115,9 +115,22 @@ def renderBatch(batch_idx, CoreID, CoreAmount, framecount, frameCountSize, WIDTH
 
         if CoreID == 0:
             fps = round(i / (now - start) * CoreAmount) if (now - start) > 0 else 0
-            print("\033[1A" + " " * 100)
-            print(f"\033[1ADrawing frame #{current_frame}{' ' * (frameCountSize - iSize)} ({' ' * (3 - percentSize)}{percentile}%) ({fps}fps) with {CoreAmount} cores")
-        
+            sys.stdout.write("\x1b[2K")
+            sys.stdout.write(f"\x1b[A\x1b[2K" * 2)
+
+            barPercentile = percentile // 2
+
+            if fps > 0:
+                eta_seconds = (framecount - current_frame) / fps
+                eta = f"ETA {eta_seconds:.1f}s"
+            else:
+                eta = "ETA ---"
+
+            print(f"\x1b[0mDrawing frame #{current_frame}{' ' * (frameCountSize - iSize)} with {CoreAmount} cores")
+            print(f"[{'\x1b[1;47m' + ' ' *barPercentile + '\x1b[0m' + ' ' * (50 - barPercentile)}] \x1b[0m({percentile:>3}%) {eta}")
+
+            sys.stdout.flush()
+
         frames.append((current_frame, drawFrame(WIDTH, HEIGHT, [(final_vertices, tesseract_edges)])))
     return frames
 
@@ -169,6 +182,7 @@ def main():
 
     ProcessAmount = multiprocessing.cpu_count()
 
+    print() # Print so cursor can move up
     print() # Print so cursor can move up
 
     start = time.time()
